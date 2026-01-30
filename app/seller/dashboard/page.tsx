@@ -67,7 +67,7 @@ const containerVariants = {
             delayChildren: 0.2
         }
     }
-};
+} as const;
 
 const itemVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -80,7 +80,7 @@ const itemVariants = {
             damping: 15
         }
     }
-};
+} as const;
 
 const cardHover = {
     initial: { scale: 1, boxShadow: "0px 0px 0px rgba(0,0,0,0)" },
@@ -89,7 +89,7 @@ const cardHover = {
         boxShadow: "0px 20px 40px rgba(0,0,0,0.08)",
         transition: { type: "spring", stiffness: 400, damping: 25 }
     }
-};
+} as const;
 
 export default function SellerDashboardPage() {
     const router = useRouter();
