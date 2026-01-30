@@ -1,0 +1,265 @@
+// Peppertap Database Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  phone         String?   @unique
+  password      String
+  name          String?
+  role          String    @default("CUSTOMER") // CUSTOMER, SELLER, DELIVERY, ADMIN
+  avatar        String?
+  blocked       Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  addresses         Address[]
+  orders            Order[]         @relation("CustomerOrders")
+  sellerOrders      Order[]         @relation("SellerOrders")
+  deliveryOrders    Order[]         @relation("DeliveryOrders")
+  products          Product[]
+  reviews           Review[]
+  wishlists         Wishlist[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  devices           Device[]
+  otpCodes          OTPCode[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([role])
+}
+
+model Product {
+  id            String          @id @default(cuid())
+  name          String
+  description   String?
+  price         Float
+  category      String          // GROCERY, VEGETABLES, RESTAURANT
+  images        String          // JSON array of image URLs
+  stock         Int             @default(0)
+  rating        Float           @default(0)
+  reviewCount   Int             @default(0)
+  sellerId      String
+  seller        User            @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  // Relations
+  orderItems    OrderItem[]
+  reviews       Review[]
+  wishlists     Wishlist[]
+
+  @@index([sellerId])
+  @@index([category])
+  @@index([isActive])
+}
+
+model Order {
+  id                String        @id @default(cuid())
+  orderNumber       String        @unique
+  status            String        @default("PENDING") // PENDING, ACCEPTED, PREPARING, READY, PICKED_UP, DELIVERED, CANCELLED, REFUNDED
+  totalAmount       Float
+  customerId        String
+  customer          User          @relation("CustomerOrders", fields: [customerId], references: [id])
+  sellerId          String?
+  seller            User?         @relation("SellerOrders", fields: [sellerId], references: [id])
+  deliveryPartnerId String?
+  deliveryPartner   User?         @relation("DeliveryOrders", fields: [deliveryPartnerId], references: [id])
+  addressId         String
+  address           Address       @relation(fields: [addressId], references: [id])
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relations
+  items             OrderItem[]
+  payment           Payment?
+  statusHistory     OrderStatusHistory[]
+
+  @@index([customerId])
+  @@index([sellerId])
+  @@index([deliveryPartnerId])
+  @@index([status])
+  @@index([orderNumber])
+}
+
+model OrderItem {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Int
+  price       Float
+  createdAt   DateTime @default(now())
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(cuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    String      // PENDING, ACCEPTED, PREPARING, READY, PICKED_UP, DELIVERED, CANCELLED, REFUNDED
+  note      String?
+  createdAt DateTime    @default(now())
+
+  @@index([orderId])
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  orderId         String        @unique
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount          Float
+  method          String        // CARD, WALLET, COD
+  status          String        @default("PENDING") // PENDING, COMPLETED, FAILED, REFUNDED
+  stripePaymentId String?
+  metadata        String?       // JSON
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating      Int
+  comment     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([productId])
+  @@index([userId])
+  @@unique([productId, userId])
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String   // e.g., "Home", "Work"
+  street    String
+  city      String
+  state     String
+  pincode   String
+  lat       Float?
+  lng       Float?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  orders    Order[]
+
+  @@index([userId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // e.g., "ORDER_UPDATE", "OTP", "PROMOTION"
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  metadata  String?  // JSON
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([read])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String   // e.g., "LOGIN", "CREATE_ORDER", "UPDATE_PRODUCT"
+  entity    String   // e.g., "User", "Order", "Product"
+  entityId  String?
+  metadata  String?  // JSON
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model Device {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fingerprint String
+  ipAddress   String
+  userAgent   String?
+  lastUsed    DateTime @default(now())
+  blocked     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([fingerprint])
+  @@index([ipAddress])
+}
+
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
+}
+
+model Coupon {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  discount  Float    // Percentage or fixed amount
+  type      String   // "PERCENTAGE" or "FIXED"
+  minOrder  Float?   // Minimum order amount
+  maxUses   Int?
+  usedCount Int      @default(0)
+  expiresAt DateTime?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([code])
+  @@index([isActive])
+}
+
+model OTPCode {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     String?
+  phone     String?
+  code      String
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([phone])
+  @@index([code])
+}
